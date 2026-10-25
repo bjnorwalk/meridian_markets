@@ -1,9 +1,10 @@
+import { LayoutPanel } from './features/layout/layout-panel'
+import { useLayoutSettings } from './features/layout/use-layout-settings'
 import {
   useEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
@@ -37,7 +38,6 @@ import {
   Pencil,
   Plus,
   RefreshCcw,
-  RotateCcw,
   Search,
   SlidersHorizontal,
   Sun,
@@ -106,8 +106,6 @@ type ConfirmAction =
   | { type: 'remove-watchlist-symbol'; symbol: string }
   | { type: 'delete-watchlist'; id: string; name: string }
   | { type: 'remove-holding'; id: string; symbol: string }
-type LayoutSettingKey = 'watchlistWidth' | 'detailsWidth' | 'chartHeight' | 'watchlistHeight'
-type LayoutSettings = Record<LayoutSettingKey, number>
 type NotificationItem = {
   id: string
   title: string
@@ -129,42 +127,6 @@ const emptyAlertDraft = {
   driftPercent: '',
   concentrationPercent: '',
   dayMovePercent: '',
-}
-
-const layoutStorageKey = 'meridian-layout-settings-v3'
-const defaultLayoutSettings: LayoutSettings = {
-  watchlistWidth: 340,
-  detailsWidth: 240,
-  chartHeight: 360,
-  watchlistHeight: 450,
-}
-const layoutRanges: Record<LayoutSettingKey, { min: number; max: number; step: number; label: string }> = {
-  watchlistWidth: { min: 220, max: 420, step: 10, label: 'Watchlist' },
-  detailsWidth: { min: 210, max: 340, step: 10, label: 'Details' },
-  chartHeight: { min: 320, max: 520, step: 10, label: 'Chart' },
-  watchlistHeight: { min: 360, max: 680, step: 10, label: 'Rows' },
-}
-
-function clampLayoutValue(key: LayoutSettingKey, value: number) {
-  const range = layoutRanges[key]
-  if (!Number.isFinite(value)) return defaultLayoutSettings[key]
-  return Math.min(range.max, Math.max(range.min, Math.round(value / range.step) * range.step))
-}
-
-function readLayoutSettings(): LayoutSettings {
-  if (typeof window === 'undefined') return defaultLayoutSettings
-
-  try {
-    const parsed = JSON.parse(window.localStorage?.getItem(layoutStorageKey) ?? '{}') as Partial<LayoutSettings>
-    return {
-      watchlistWidth: clampLayoutValue('watchlistWidth', Number(parsed.watchlistWidth)),
-      detailsWidth: clampLayoutValue('detailsWidth', Number(parsed.detailsWidth)),
-      chartHeight: clampLayoutValue('chartHeight', Number(parsed.chartHeight)),
-      watchlistHeight: clampLayoutValue('watchlistHeight', Number(parsed.watchlistHeight)),
-    }
-  } catch {
-    return defaultLayoutSettings
-  }
 }
 
 function App() {
@@ -191,7 +153,7 @@ function App() {
   const [isAlertEditorOpen, setIsAlertEditorOpen] = useState(false)
   const [alertDraft, setAlertDraft] = useState(emptyAlertDraft)
   const [isLayoutEditorOpen, setIsLayoutEditorOpen] = useState(false)
-  const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>(() => readLayoutSettings())
+  const { layoutSettings, layoutStyle, updateLayoutSetting, resetLayoutSettings } = useLayoutSettings()
   const [activeInsightTab, setActiveInsightTab] = useState<InsightTab>('trending')
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const portfolioImportRef = useRef<HTMLInputElement | null>(null)
@@ -235,35 +197,6 @@ function App() {
     const interval = window.setInterval(fetchClock, 60000)
     return () => { isMounted = false; window.clearInterval(interval) }
   }, [])
-
-  useEffect(() => {
-    try {
-      window.localStorage?.setItem(layoutStorageKey, JSON.stringify(layoutSettings))
-    } catch {
-      // Layout persistence is optional; the controls still work for the current session.
-    }
-  }, [layoutSettings])
-
-  const layoutStyle = useMemo(
-    () => ({
-      '--layout-watchlist-width': `${layoutSettings.watchlistWidth}px`,
-      '--layout-details-width': `${layoutSettings.detailsWidth}px`,
-      '--layout-chart-height': `${layoutSettings.chartHeight}px`,
-      '--layout-watchlist-height': `${layoutSettings.watchlistHeight}px`,
-    }) as CSSProperties,
-    [layoutSettings],
-  )
-
-  const updateLayoutSetting = (key: LayoutSettingKey, value: string) => {
-    setLayoutSettings((current) => ({
-      ...current,
-      [key]: clampLayoutValue(key, Number(value)),
-    }))
-  }
-
-  const resetLayoutSettings = () => {
-    setLayoutSettings(defaultLayoutSettings)
-  }
 
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
@@ -1404,35 +1337,7 @@ function App() {
       </header>
 
       {isLayoutEditorOpen && (
-        <section className="layout-panel" aria-label="Layout controls">
-          <div className="layout-panel-heading">
-            <span>Layout</span>
-            <small>{layoutSettings.watchlistWidth}/{layoutSettings.detailsWidth}</small>
-          </div>
-          {(Object.keys(layoutRanges) as LayoutSettingKey[]).map((key) => {
-            const range = layoutRanges[key]
-            return (
-              <label className="layout-control" key={key}>
-                <span>{range.label}</span>
-                <input
-                  aria-label={`${range.label} size`}
-                  max={range.max}
-                  min={range.min}
-                  onChange={(event) => updateLayoutSetting(key, event.target.value)}
-                  onInput={(event) => updateLayoutSetting(key, event.currentTarget.value)}
-                  step={range.step}
-                  type="range"
-                  value={layoutSettings[key]}
-                />
-                <em>{layoutSettings[key]}</em>
-              </label>
-            )
-          })}
-          <button aria-label="Reset layout" onClick={resetLayoutSettings} title="Reset layout" type="button">
-            <RotateCcw aria-hidden="true" size={14} />
-            Reset
-          </button>
-        </section>
+        <LayoutPanel layoutSettings={layoutSettings} updateLayoutSetting={updateLayoutSetting} resetLayoutSettings={resetLayoutSettings} />
       )}
 
       {confirmCopy && (
