@@ -50,7 +50,7 @@ Market credentials stay on the server. Account data is stored in SQLite; hosted 
 - **Put providers behind server-side adapters.** Credentials stay out of the frontend and provider integration has a defined boundary. Provider permissions, availability, and schema changes still affect the application.
 - **Use SQLite for persistence.** A local database keeps the deployment compact. It requires deliberate volume configuration and a backup plan; this repository does not establish a distributed database architecture.
 - **Allow demo-data fallback.** The dashboard can illustrate interactions when live data is unavailable. This means successful rendering is not evidence that every value is live.
-- **Refactor incrementally.** Layout settings now have a focused feature boundary and regression tests. Further separation of responsibilities in the main application remains worthwhile.
+- **Refactor incrementally.** Layout settings and symbol search now have focused feature boundaries and regression tests. Further separation of responsibilities in the main application remains worthwhile.
 
 ## Current limits
 

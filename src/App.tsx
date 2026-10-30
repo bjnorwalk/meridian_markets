@@ -1,3 +1,4 @@
+import { useSymbolSearch } from './features/search/use-symbol-search'
 import { LayoutPanel } from './features/layout/layout-panel'
 import { useLayoutSettings } from './features/layout/use-layout-settings'
 import {
@@ -7,7 +8,6 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
-  type KeyboardEvent,
 } from 'react'
 import {
   closestCenter,
@@ -133,13 +133,6 @@ function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [showAuth, setShowAuth] = useState(false)
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SymbolRecord[]>([])
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [isSearchLoading, setIsSearchLoading] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
-  const [activeResultIndex, setActiveResultIndex] = useState(0)
-  const [selectedSearchRecord, setSelectedSearchRecord] = useState<SymbolRecord | null>(null)
   const [watchlistEditorMode, setWatchlistEditorMode] = useState<'create' | 'rename' | null>(null)
   const [watchlistNameDraft, setWatchlistNameDraft] = useState('')
   const [watchlistUiError, setWatchlistUiError] = useState<string | null>(null)
@@ -254,6 +247,12 @@ function App() {
     updatePortfolioHolding,
   } = useMarketData(Boolean(authUser))
 
+  const {
+    query, results, isSearchOpen, isSearchLoading, searchError,
+    activeResultIndex, selectedSearchRecord, setSelectedSearchRecord, setIsSearchOpen,
+    setActiveResultIndex, selectSearchResult, handleSearchChange, handleSearchKeyDown,
+  } = useSymbolSearch(searchSymbols, setSelectedSymbol)
+
   const [lastRefreshTime, setLastRefreshTime] = useState(() => Date.now())
   const [now, setNow] = useState(() => Date.now())
   const [notifPanelOpen, setNotifPanelOpen] = useState(false)
@@ -318,41 +317,6 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    let isMounted = true
-    const trimmedQuery = query.trim()
-
-    if (!trimmedQuery) {
-      return () => {
-        isMounted = false
-      }
-    }
-
-    const timeout = window.setTimeout(() => {
-      searchSymbols(trimmedQuery)
-        .then((items) => {
-          if (!isMounted) return
-          setResults(items.slice(0, 12))
-          setActiveResultIndex(0)
-          setSearchError(null)
-        })
-        .catch((reason: unknown) => {
-          if (!isMounted) return
-          setResults([])
-          setSearchError(
-            reason instanceof Error ? reason.message : 'Symbol search failed',
-          )
-        })
-        .finally(() => {
-          if (isMounted) setIsSearchLoading(false)
-        })
-    }, 120)
-
-    return () => {
-      isMounted = false
-      window.clearTimeout(timeout)
-    }
-  }, [query, searchSymbols])
 
   const watchlistSymbols = authUser ? watchlist : symbols.filter((item) => defaultWatchlist.includes(item.symbol))
   const displayedWatchlistSymbols = useMemo(() => {
@@ -643,17 +607,6 @@ function App() {
       },
     ]
   }, [portfolioPositions])
-
-  const selectSearchResult = (item: SymbolRecord) => {
-    setSelectedSearchRecord(item)
-    setSelectedSymbol(item.symbol)
-    setQuery('')
-    setResults([])
-    setSearchError(null)
-    setIsSearchLoading(false)
-    setIsSearchOpen(false)
-    setActiveResultIndex(0)
-  }
 
   const handleAddSearchResultToWatchlist = async (item: SymbolRecord) => {
     try {
@@ -966,58 +919,6 @@ function App() {
     } catch (reason) {
       setPortfolioUiMessage(null)
       setPortfolioUiError(reason instanceof Error ? reason.message : 'Portfolio import failed')
-    }
-  }
-
-  const handleSearchChange = (value: string) => {
-    setQuery(value)
-    setResults([])
-    setSearchError(null)
-    setActiveResultIndex(0)
-
-    if (!value.trim()) {
-      setResults([])
-      setIsSearchLoading(false)
-      setIsSearchOpen(false)
-      return
-    }
-
-    setIsSearchOpen(true)
-    setIsSearchLoading(true)
-  }
-
-  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (!isSearchOpen && event.key !== 'Escape') setIsSearchOpen(true)
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      setActiveResultIndex((current) =>
-        results.length ? (current + 1) % results.length : 0,
-      )
-      return
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      setActiveResultIndex((current) =>
-        results.length ? (current - 1 + results.length) % results.length : 0,
-      )
-      return
-    }
-
-    if (event.key === 'Enter' && activeResult) {
-      event.preventDefault()
-      selectSearchResult(activeResult)
-      return
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      setQuery('')
-      setResults([])
-      setSearchError(null)
-      setIsSearchLoading(false)
-      setIsSearchOpen(false)
     }
   }
 
